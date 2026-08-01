@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Endless Runner</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 400px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      background-color: #70c5ce;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    h1 {
+      font-size: 36px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    p {
+      font-size: 18px;
+      color: #dddddd;
+    }
+
+    button {
+      padding: 12px 28px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffffff;
+      background-color: #ff4757;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    button:hover {
+      background-color: #ff6b81;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <!-- Start Overlay -->
+    <div id="startScreen" class="overlay">
+      <h1>Endless Runner</h1>
+      <p>Press Spacebar or Click to Jump</p>
+      <button id="startButton">Start Game</button>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOverScreen" class="overlay hidden">
+      <h1>Game Over</h1>
+      <p id="finalScoreText">Score: 0</p>
+      <p id="highScoreText">High Score: 0</p>
+      <button id="restartButton">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const startButton = document.getElementById('startButton');
+    const restartButton = document.getElementById('restartButton');
+    const finalScoreText = document.getElementById('finalScoreText');
+    const highScoreText = document.getElementById('highScoreText');
+
+    // Game Variables
+    let gameActive = false;
+    let score = 0;
+    let highScore = 0;
+    let gameSpeed = 6;
+    let frameCount = 0;
+    let animationFrameId;
+
+    const groundY = canvas.height - 50;
+
+    // Player Object
+    const player = {
+      x: 80,
+      y: groundY - 40,
+      width: 40,
+      height: 40,
+      velocityY: 0,
+      gravity: 0.7,
+      jumpStrength: -13,
+      isGrounded: false,
+
+      jump() {
+        if (this.isGrounded) {
+          this.velocityY = this.jumpStrength;
+          this.isGrounded = false;
+        }
+      },
+
+      update() {
+        this.velocityY += this.gravity;
+        this.y += this.velocityY;
+
+        // Ground Collision
+        if (this.y + this.height >= groundY) {
+          this.y = groundY - this.height;
+          this.velocityY = 0;
+          this.isGrounded = true;
+        }
+      },
+
+      draw() {
+        ctx.fillStyle = '#ff4757';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        // Eye detail
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(this.x + 25, this.y + 8, 8, 8);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(this.x + 29, this.y + 10, 4, 4);
+      }
+    };
+
+    // Obstacle Management
+    let obstacles = [];
+
+    class Obstacle {
+      constructor() {
+        this.width = 20 + Math.random() * 25;
+        this.height = 30 + Math.random() * 35;
+        this.x = canvas.width;
+        this.y = groundY - this.height;
+        this.markedForDeletion = false;
+      }
+
+      update() {
+        this.x -= gameSpeed;
+        if (this.x + this.width < 0) {
+          this.markedForDeletion = true;
+        }
+      }
+
+      draw() {
+        ctx.fillStyle = '#2ed573';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+    }
+
+    function handleObstacles() {
+      // Spawn obstacle periodically
+      if (frameCount % Math.max(50, Math.floor(120 - gameSpeed * 3)) === 0) {
+        obstacles.push(new Obstacle());
+      }
+
+      for (let i = 0; i < obstacles.length; i++) {
+        obstacles[i].update();
+        obstacles[i].draw();
+
+        // Axis-Aligned Bounding Box Collision Detection
+        if (
+          player.x < obstacles[i].x + obstacles[i].width &&
+          player.x + player.width > obstacles[i].x &&
+          player.y < obstacles[i].y + obstacles[i].height &&
+          player.y + player.height > obstacles[i].y
+        ) {
+          endGame();
+        }
+      }
+
+      obstacles = obstacles.filter(obs => !obs.markedForDeletion);
+    }
+
+    // Ground Drawing
+    function drawEnvironment() {
+      // Ground
+      ctx.fillStyle = '#2f3542';
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+      // Grass top line
+      ctx.fillStyle = '#7bed9f';
+      ctx.fillRect(0, groundY, canvas.width, 6);
+    }
+
+    // UI Overlay Drawing
+    function drawScore() {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText(`Score: ${Math.floor(score)}`, 20, 35);
+    }
+
+    // Game Loop
+    function animate() {
+      if (!gameActive) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawEnvironment();
+
+      player.update();
+      player.draw();
+
+      handleObstacles();
+
+      score += 0.1;
+      gameSpeed += 0.001; // Gradually increase difficulty
+      frameCount++;
+
+      drawScore();
+
+      animationFrameId = requestAnimationFrame(animate);
+    }
+
+    // Start Game
+    function startGame() {
+      gameActive = true;
+      score = 0;
+      gameSpeed = 6;
+      frameCount = 0;
+      obstacles = [];
+      player.y = groundY - player.height;
+      player.velocityY = 0;
+
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+
+      animate();
+    }
+
+    // End Game
+    function endGame() {
+      gameActive = false;
+      cancelAnimationFrame(animationFrameId);
+
+      const finalScore = Math.floor(score);
+      if (finalScore > highScore) {
+        highScore = finalScore;
+      }
+
+      finalScoreText.textContent = `Score: ${finalScore}`;
+      highScoreText.textContent = `High Score: ${highScore}`;
+
+      gameOverScreen.classList.remove('hidden');
+    }
+
+    // Input Listeners
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (gameActive) {
+          player.jump();
+        } else if (gameOverScreen.classList.contains('hidden')) {
+          startGame();
+        }
+      }
+    });
+
+    canvas.addEventListener('mousedown', () => {
+      if (gameActive) {
+        player.jump();
+      }
+    });
+
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', startGame);
+
+    // Initial Static Render
+    drawEnvironment();
+    player.draw();
+  </script>
+</body>
+</html>
