@@ -249,6 +249,14 @@
       ctx.fillText(`Score: ${Math.floor(score)}`, 20, 35);
     }
 
+    function drawCredit() {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('MADE BY JINAY ADANI', canvas.width / 2, 35);
+      ctx.textAlign = 'left';
+    }
+
     // Game Loop
     function animate() {
       if (!gameActive) return;
@@ -267,6 +275,7 @@
       frameCount++;
 
       drawScore();
+      drawCredit();
 
       animationFrameId = requestAnimationFrame(animate);
     }
