@@ -20,12 +20,15 @@
       align-items: center;
       min-height: 100vh;
       overflow: hidden;
+      touch-action: manipulation;
     }
 
     #game-container {
       position: relative;
       width: 800px;
       height: 400px;
+      max-width: 100vw;
+      max-height: 100vh;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       border-radius: 8px;
       overflow: hidden;
@@ -33,7 +36,10 @@
 
     canvas {
       display: block;
+      width: 100%;
+      height: 100%;
       background-color: #70c5ce;
+      touch-action: none;
     }
 
     .overlay {
@@ -64,6 +70,8 @@
     p {
       font-size: 18px;
       color: #dddddd;
+      text-align: center;
+      padding: 0 10px;
     }
 
     button {
@@ -76,6 +84,8 @@
       border-radius: 6px;
       cursor: pointer;
       transition: background-color 0.2s, transform 0.1s;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     button:hover {
@@ -96,7 +106,7 @@
     <!-- Start Overlay -->
     <div id="startScreen" class="overlay">
       <h1>Endless Runner</h1>
-      <p>Press Spacebar or Click to Jump</p>
+      <p>Press Spacebar or Tap Screen to Jump</p>
       <button id="startButton">Start Game</button>
     </div>
 
@@ -293,7 +303,7 @@
       gameOverScreen.classList.remove('hidden');
     }
 
-    // Input Listeners
+    // Keyboard Controls
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
@@ -305,12 +315,26 @@
       }
     });
 
+    // Mouse Controls
     canvas.addEventListener('mousedown', () => {
       if (gameActive) {
         player.jump();
       }
     });
 
+    // Touch Controls for Mobile Devices
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameActive) {
+        player.jump();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+    }, { passive: false });
+
+    // Overlay Buttons
     startButton.addEventListener('click', startGame);
     restartButton.addEventListener('click', startGame);
 
